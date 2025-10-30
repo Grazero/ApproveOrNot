@@ -3,8 +3,9 @@
     <div class="@title text-center">Approve_or_Not (IT 03-1)</div>
 
     <div class="@content my-5">
-      <div class="my-2 flex justify-start gap-2">
-        <BaseButton
+      <div class="my-2 flex justify-between gap-2">
+         <div class="flex gap-2">
+            <BaseButton
           variant="success"
           @click="openActionModal('approve')"
         >
@@ -16,6 +17,16 @@
         >
           <span class="text-white">ไม่อนุมัติ</span>
         </BaseButton>
+         </div>
+
+         <div>
+            <BaseButton
+          variant="secondary"
+          @click="handlerefresh()"
+        >
+          <span class="text-white">เริ่มใหม่</span>
+        </BaseButton>
+         </div>
       </div>
       <div class="overflow-x-auto shadow-md rounded-lg">
         <table class="min-w-full divide-y divide-gray-200">
@@ -81,9 +92,9 @@
               >
                 <span
                   class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full"
-                  :class="getStatusData(request.status_id).class"
+                  :class="getStatusData(request.statusId).class"
                 >
-                  {{ getStatusData(request.status_id).text }}
+                  {{ getStatusData(request.statusId).text }}
                 </span>
               </td>
               <td
@@ -129,15 +140,37 @@
   </BaseModal>
 </template>
 <script setup>
-import { ref, computed } from "vue";
+
+import { ref, computed, onMounted } from "vue"; // 1. เพิ่ม onMounted
+
+import axios from "axios"; // 2. import axios
+
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
+
 import BaseButton from "@/components/base/BaseButton.vue"; // ใช้ Alias '@' ที่กำหนดใน vite.config.js
 import BaseModal from "@/components/base/BaseModal.vue";
-const requests = ref([
-  { id: 1, title: "ขออนุมัติงบประมาณ แผนก IT", status_id: 0, reason: "" },
-  { id: 2, title: "ขออนุมัติจัดซื้อคอมพิวเตอร์", status_id: 0 , reason: ""},
-  { id: 3, title: "ขออนุมัติลาพักร้อน นาย A", status_id: 1 , reason: ""}, // <--- สถานะ 1 (อนุมัติแล้ว)
-  { id: 4, title: "ขออนุมัติจัดซื้อคอมพิวเตอร์", status_id: 2 , reason: "โยว"}, // <--- สถานะ 2 (ไม่อนุมัติ)
-]);
+
+const requests = ref([]);
+
+const fetchRequests = async () => {
+  try {
+    const response = await axios.get(`${API_BASE_URL}/requests`);
+    // API C# คืนค่าในรูปแบบ { status: 200, message: "...", data: [...] }
+    if (response.data.status === 200) {
+        requests.value = response.data.data;
+    } else {
+        console.error("API Error:", response.data.message);
+        // อาจจะแสดง Error message ให้ผู้ใช้เห็น
+    }
+  } catch (error) {
+    console.error("Fetch failed:", error);
+    // กรณีที่เกิด CORS Error หรือ Network Error
+  }
+};
+
+onMounted(() => {
+    fetchRequests();
+});
 
 // **Logic สำหรับการจัดเรียง (ต้องเขียนเพิ่ม)**
 const sortedRequests = computed(() => {
@@ -148,7 +181,7 @@ const sortedRequests = computed(() => {
 // **ฟังก์ชันใหม่: ตรวจสอบว่ารายการสามารถทำ Action ได้หรือไม่**
 const isActionable = (request) => {
   // รายการที่สามารถอนุมัติ/ไม่อนุมัติได้คือ status_id เป็น 0 เท่านั้น
-  return request.status_id === 0;
+  return request.statusId === 0;
 };
 
 // **Computed Property ใหม่:** ตรวจสอบว่ารายการทั้งหมดถูกเลือกหรือไม่
@@ -226,7 +259,7 @@ const openActionModal = ( actionType) => {
 
 const modalActionType = ref(""); // **สถานะใหม่: 'approve' หรือ 'reject'**
 
-const handleConfirmAction = () => {
+const handleConfirmAction = async () => {
   const action = modalActionType.value === "approve" ? "อนุมัติ" : "ไม่อนุมัติ";
 
   console.log(
@@ -234,5 +267,47 @@ const handleConfirmAction = () => {
   );
   selectedRequest.value = null;
   showModal.value = false; // ปิด Modal หลังดำเนินการ
+
+  const payload = {
+    ActionType: modalActionType.value, // 'approve' หรือ 'reject'
+    RequestIds: selectedRequestIds.value,
+    Reason: reason.value, // ส่งเหตุผลไปด้วย
+  };
+
+  try {
+    const response = await axios.post(`${API_BASE_URL}/batch-action`, payload);
+
+    if (response.data.status === 200) {
+      alert(response.data.message);
+      showModal.value = false;
+      selectedRequestIds.value = []; // ล้างรายการที่เลือก
+      await fetchRequests(); // ดึงข้อมูลใหม่เพื่อรีเฟรชตาราง
+    } else {
+      alert(response.data.message);
+    }
+  } catch (error) {
+    console.error("Action failed:", error);
+    alert("เกิดข้อผิดพลาดในการเชื่อมต่อ API");
+  }
+
 };
+
+const handlerefresh = async () => {
+  try {
+    const response = await axios.get(`${API_BASE_URL}/refresh-data-status`, {});
+
+    if (response.data.status === 200) {
+      alert(response.data.message);
+     
+      await fetchRequests(); // ดึงข้อมูลใหม่เพื่อรีเฟรชตาราง
+    } else {
+      alert(response.data.message);
+    }
+  } catch (error) {
+    console.error("Action failed:", error);
+    alert("เกิดข้อผิดพลาดในการเชื่อมต่อ API");
+  }
+}
+
+
 </script>
