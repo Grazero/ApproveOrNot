@@ -127,15 +127,16 @@
     </template>
 
     <template #footer>
-      <BaseButton variant="secondary" @click="showModal = false">
-        ยกเลิก
-      </BaseButton>
       <BaseButton
         :variant="modalActionType === 'approve' ? 'primary' : 'danger'"
         @click="handleConfirmAction"
       >
         ยืนยัน
       </BaseButton>
+      <BaseButton variant="secondary" @click="showModal = false">
+        ยกเลิก
+      </BaseButton>
+      
     </template>
   </BaseModal>
 </template>
