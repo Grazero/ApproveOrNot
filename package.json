@@ -10,7 +10,7 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "deploy":"npm run build && git add dist -f && git commit -m 'Deploy Vue App' && git subtree push --prefix dist origin gh-pages"
+    "deploy": "npm run build && git add dist -f && git commit dist -m 'Deploy Vue App' && git subtree push --prefix dist origin gh-pages"
     
   },
   "dependencies": {
